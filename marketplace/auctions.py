@@ -57,7 +57,7 @@ class Auctions(dict):
 
         # für erstes Praktikum auf None setzen und für 2. Praktikum auf MaxHeap()
         try:
-            self._heap: Optional[MaxHeap] = MaxHeap()  # None
+            self._heap: Optional[MaxHeap] = None  # zweite Praktikum MaxHeap
         except NotImplementedError:
             self._heap = None
 
