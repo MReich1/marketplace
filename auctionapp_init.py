@@ -1260,6 +1260,10 @@ class AuctionAppInit:
             self.trie.insert(product_name)
             self.avl_tree.insert(product_name, count)
 
+        # Zeige auch die Nutzer-IDs im Autocomplete an
+        for uid in self._users:
+            self.trie.insert(uid)
+
     def rebuild_trie(self) -> None:
         """Baut Trie und AVL-Baum neu auf, damit auch neu erstellte Auktionen vorgeschlagen werden.
 
