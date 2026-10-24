@@ -34,6 +34,7 @@ class SetNode:
             None
         """
         # TODO for students (Praktikum 1): ergänzen Sie hier die private Membervariable _praktikumsgruppe
+        self._praktikumsgruppe: int
 
         # TODO: werden nur für Praktikum 3 benötigt
         self._parent: SetNode = self   # parent Knoten des SetNode Objekts. self bedeutet, dass der Knoten ein Wurzelknoten ist
@@ -114,8 +115,13 @@ class Praktikumsgruppen(dict):
         Raises:
             None
         """
-        # TODO: implement in Praktikum 1
-        pass
+
+        if len(user_ids) != len(groupnumbers):
+            return
+
+        for i, user_id in enumerate(user_ids):
+            if user_id in self:
+                self[user_id]._praktikumsgruppe = groupnumbers[i]
 
     # *** PUBLIC GET methods ***
 
@@ -131,8 +137,19 @@ class Praktikumsgruppen(dict):
         Raises:
             KeyError: Falls `user_id` nicht im Wörterbuch existiert.
         """
-        # TODO: implement in Praktikum 1
-        pass
+        # Laufzeit O(n)
+        if user_id not in self:
+            return []
+
+        target_group_id = self[user_id]._praktikumsgruppe
+        members: List[str] = []
+
+        for uid, user in self.items():
+            if user._praktikumsgruppe == target_group_id:
+                members.append(uid)
+
+        return members
+
 
     def print_ds(self) -> None:
         """Gibt die Disjoint-Set-Struktur aus.
