@@ -19,9 +19,9 @@ import marketplace.auctions
 import sys
 
 THEME = {
-    "bg_app": "#F1F5F9",
-    "bg_card": "#FFFFFF",
-    "fg_text": "#0F172A",
+    "bg_app": "#4F4F4F",
+    "bg_card": "#363636",
+    "fg_text": "#FFFFFF",
     "fg_muted": "#475569",
     "primary": "#2563EB",
     "primary_hover": "#1D4ED8",
