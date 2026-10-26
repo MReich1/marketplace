@@ -727,9 +727,6 @@ class Auctions(dict):
 
                 # self.add_new_auction(user_id, item_name, description, float(value_min))
                 item = marketplace.item.Item(item_name, description, float(value_min))
-
-                #ADT map , weil wert über schlüssel gefunden wird
-                #Datenstruktur: Hashtabelle
                 auction, auction_id = self._new_auction(user_id, item)
 
                 auctions[auction_id] = auction

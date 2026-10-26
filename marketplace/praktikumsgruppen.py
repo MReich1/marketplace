@@ -118,7 +118,6 @@ class Praktikumsgruppen(dict):
             None
         """
         # TODO: implement in Praktikum 1
-        # Laufzeit O(n)
         for i in range(len(user_ids)):
             uid = user_ids[i]
             grp = groupnumbers[i]
@@ -141,14 +140,11 @@ class Praktikumsgruppen(dict):
             KeyError: Falls `user_id` nicht im Wörterbuch existiert.
         """
         # TODO: implement in Praktikum 1
-        #Laufzeit : worstcase O(n),
-        # bestcase O(n),
-        # ausnahme wenn user_id nicht im dict. ist O(1)
-        target_id = self[user_id]._praktikumsgruppe #: zugriff auf dict. O(1)
-        members = [] #: leeres array O(1)
-        for uid in self: # wird n mal durchlaufen O(n)
-            if self[uid]._praktikumsgruppe == target_id: #self[uid] beinhaltet den KeyError bereits | lookup über schlüssel und vergleich O(1)
-                members.append(uid) #: O(1)
+        target_id = self[user_id]._praktikumsgruppe
+        members = []
+        for uid in self:
+            if self[uid]._praktikumsgruppe == target_id: #self[uid] beinhaltet den KeyError bereits
+                members.append(uid)
         return members
 
     def print_ds(self) -> None:
