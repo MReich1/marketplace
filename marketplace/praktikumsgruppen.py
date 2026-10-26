@@ -11,8 +11,6 @@ Union, Find mit Pfadkomprimierung).
 #
 from typing import Any, List, Optional, Union
 
-from networkx.classes import non_neighbors
-
 
 class SetNode:
     """Klasse zur Repräsentation eines Knotens in einer Disjoint-Set-Struktur (Union-Find).
@@ -36,7 +34,6 @@ class SetNode:
             None
         """
         # TODO for students (Praktikum 1): ergänzen Sie hier die private Membervariable _praktikumsgruppe
-        self._praktikumsgruppe = None
 
         # TODO: werden nur für Praktikum 3 benötigt
         self._parent: SetNode = self   # parent Knoten des SetNode Objekts. self bedeutet, dass der Knoten ein Wurzelknoten ist
@@ -118,12 +115,7 @@ class Praktikumsgruppen(dict):
             None
         """
         # TODO: implement in Praktikum 1
-        for i in range(len(user_ids)):
-            uid = user_ids[i]
-            grp = groupnumbers[i]
-            if uid in self:
-                self[uid]._praktikumsgruppe = grp
-
+        pass
 
     # *** PUBLIC GET methods ***
 
@@ -140,12 +132,7 @@ class Praktikumsgruppen(dict):
             KeyError: Falls `user_id` nicht im Wörterbuch existiert.
         """
         # TODO: implement in Praktikum 1
-        target_id = self[user_id]._praktikumsgruppe
-        members = []
-        for uid in self:
-            if self[uid]._praktikumsgruppe == target_id: #self[uid] beinhaltet den KeyError bereits
-                members.append(uid)
-        return members
+        pass
 
     def print_ds(self) -> None:
         """Gibt die Disjoint-Set-Struktur aus.
