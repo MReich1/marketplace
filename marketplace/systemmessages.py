@@ -68,6 +68,9 @@ class SystemMessages:
         Raises:
             None
         """
+
+        #ADT: Queue / warteschlange. Grund: FiFo prinzip
+        #Datenstruktur: Liste/ Dynamisches Array
         self._queue.append(message)
         if not self._displaying:
             self._display_next_message()
