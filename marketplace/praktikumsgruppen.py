@@ -147,7 +147,7 @@ class Praktikumsgruppen(dict):
         target_id = self[user_id]._praktikumsgruppe #: zugriff auf dict. O(1)
         members = [] #: leeres array O(1)
         for uid in self: # wird n mal durchlaufen O(n)
-            if self[uid]._praktikumsgruppe == target_id: #self beinhaltet den KeyError bereits | lookup über schlüssel und vergleich O(1)
+            if self[uid]._praktikumsgruppe == target_id: #self[uid] beinhaltet den KeyError bereits | lookup über schlüssel und vergleich O(1)
                 members.append(uid) #: O(1)
         return members
 

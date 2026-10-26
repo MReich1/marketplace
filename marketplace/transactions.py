@@ -8,8 +8,6 @@ from dataclasses import dataclass
 from datetime import datetime
 from typing import List
 
-from sklearn.feature_extraction import _hash
-
 
 @dataclass(frozen=True)
 class Transaction:
@@ -49,7 +47,6 @@ class Transaction:
 class Transactions:
     """Hashtabelle zur Speicherung von Transaktionen und Erfassung von Hash-Kollisionen.
 
-    #TODO: bei einer idealen hashfunktion sind n²/2048 kollisionen zu erwarten.
     Attributes:
         _capacity (int): Kapazität/Anzahl der Buckets der Hashtabelle.
         _buckets (List[List[Transaction]]): Liste der Buckets für Transaktionen.
@@ -160,16 +157,8 @@ class Transactions:
         """
         # Deliberately bad key function:
         # Use ONLY the first character of the product name.
-        #if not tx.product_name:
-            #return 0
-        #first = tx.product_name[0].lower()
+        if not tx.product_name:
+            return 0
+        first = tx.product_name[0].lower()
         # Map 'a'..'z' to 0..25, everything else also squeezed into the table
-        #return (ord(first) - ord('a')) % self._capacity
-
-        # Bessere Funktion für hash
-        attributes = (tx.seller,tx.buyer,tx.price,tx.timestamp,tx.product_name) # alle attribute werden verwendet
-        # nicht nur eins wie davor
-        raw_hash = hash(attributes)
-        index = raw_hash % self._capacity
-        return index
-
+        return (ord(first) - ord('a')) % self._capacity
