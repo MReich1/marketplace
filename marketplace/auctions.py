@@ -57,7 +57,7 @@ class Auctions(dict):
 
         # für erstes Praktikum auf None setzen und für 2. Praktikum auf MaxHeap()
         try:
-            self._heap: Optional[MaxHeap] = None  # zweite Praktikum MaxHeap
+            self._heap: Optional[MaxHeap] = MaxHeap()  # None
         except NotImplementedError:
             self._heap = None
 
@@ -727,9 +727,6 @@ class Auctions(dict):
 
                 # self.add_new_auction(user_id, item_name, description, float(value_min))
                 item = marketplace.item.Item(item_name, description, float(value_min))
-
-                #ADT map , weil wert über schlüssel gefunden wird
-                #Datenstruktur: Hashtabelle
                 auction, auction_id = self._new_auction(user_id, item)
 
                 auctions[auction_id] = auction

@@ -1003,9 +1003,8 @@ class AuctionAppInit:
             suggestions = self.trie.search(search_text)
             # TODO for students (Praktikum 1): nutzen Sie hier die Vorschläge des AVL-Baums und vergleichen Sie
             #  die Laufzeit mit der des Tries
-            avl_suggestions = self.avl_tree.find_most_likely_words(search_text)
+            # avl_suggestions = self.avl_tree.find_most_likely_words(search_text)
             self.show_tooltip(suggestions)
-            self.show_tooltip(avl_suggestions)
         else:
             self.hide_tooltip()
 
@@ -1260,14 +1259,6 @@ class AuctionAppInit:
         for product_name, count in tuple_list:
             self.trie.insert(product_name)
             self.avl_tree.insert(product_name, count)
-
-        #Anzeigen der nutzerId's im suchfeld FÜR TRIE
-        for user_id in self._users:
-            self.trie.insert(user_id)
-        #Anzeigen der nutzerId's im suchfeld FÜR AVL
-        for user_id in self._users:
-            self.avl_tree.insert(user_id, 0)
-        #Unterschiede in der Laufzeit nicht feststellbar da datensätze zu klein sind.
 
     def rebuild_trie(self) -> None:
         """Baut Trie und AVL-Baum neu auf, damit auch neu erstellte Auktionen vorgeschlagen werden.
