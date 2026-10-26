@@ -6,6 +6,7 @@ zur Erfassung und Zählung von Kaufabwicklungs-Transaktionen und Hash-Kollisione
 
 from dataclasses import dataclass
 from datetime import datetime
+from math import floor
 from typing import List
 
 
@@ -93,6 +94,7 @@ class Transactions:
         bucket = self._buckets[idx]
         if len(bucket) > 0:
             self._collisions += 1
+            print(self._collisions)
         bucket.append(tx)
         self._size += 1
 
@@ -155,10 +157,13 @@ class Transactions:
         Raises:
             None
         """
-        # Deliberately bad key function:
-        # Use ONLY the first character of the product name.
         if not tx.product_name:
             return 0
-        first = tx.product_name[0].lower()
-        # Map 'a'..'z' to 0..25, everything else also squeezed into the table
-        return (ord(first) - ord('a')) % self._capacity
+
+        sum = 1
+        for i, char in enumerate(tx.product_name):
+            if not char.isspace():
+                sum += (ord(char.lower()) - ord('a') + 1) * (i + 1)
+
+        x = (sum + floor(tx.timestamp.timestamp())) % self._capacity
+        return x

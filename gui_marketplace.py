@@ -145,4 +145,5 @@ class AuctionApp(AuctionAppInit):
 if __name__ == "__main__":
     root = tk.Tk()
     app = AuctionApp(root)
+    # print(app._users.get_groupmembers("mreich1"))
     root.mainloop()
