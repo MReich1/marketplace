@@ -102,7 +102,7 @@ class Simulator:
 
         # threading.Timer(30, self.create_random_auctions, args=(auctions, current_user_id)).start()
 
-    def randomly_rate_users(self, users: marketplace.users.Users, current_user_id: str) -> None:
+    def randomly_rate_users(self, users: marketplace.users.Users, current_user_id: str, heap_users_rated:Any = None) -> None:
         """Vergibt zufällige Sterne-Bewertungen an Benutzer.
 
         Args:
@@ -123,10 +123,13 @@ class Simulator:
         for _ in range(35):
             random_user = random.choice(user_ids)
             stars = random.randint(1, 5)
-            # TODO for students (Praktikum 2): damit Ihre Datenstruktur für den am besten bewerteten User aktuell
-            #  bleibt, muss sie nach jeder Bewertung aktualisiert werden. Dafür dürfen Sie diese Methode anpassen.
             users[random_user].rate_user(stars)
-
+            if(heap_users_rated is not None):
+                new_mean = users[random_user].get_rating_stars_mean()
+                if (random_user not in heap_users_rated.auctions_map):
+                    heap_users_rated.add_auction(random_user, new_mean)
+                else:
+                    heap_users_rated.update_bidders(random_user,new_mean)
     def stop(self) -> None:
         """Stoppt die Ausführung der Simulation.
 
