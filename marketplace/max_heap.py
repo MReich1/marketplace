@@ -9,8 +9,6 @@ befindet sich an der Spitze des Heaps.
 
 # Die Klasse MaxHeap implementiert einen Max-Heap
 
-# TODO: Diese Klasse implementieren Sie in Praktikum 2
-
 from typing import Any, Dict, List, Optional, Tuple
 
 
@@ -41,8 +39,6 @@ class MaxHeap:
         """
         self.heap: List[Tuple[int, str]] = []
         self.auction_map: Dict[str, Tuple[int, int]] = {}
-        # TODO: wenn Sie die anderen Methoden implementiert haben, können Sie diese Zeile auskommentieren
-        raise NotImplementedError
 
     # *** PUBLIC methods ***
 
@@ -62,8 +58,11 @@ class MaxHeap:
         if auction_id in self.auction_map:
             raise ValueError("Auktion existiert bereits")
 
-        # TODO:
-        raise NotImplementedError
+        # Neues Element ans Ende anfügen und nach oben sortieren: O(log n)
+        self.heap.append((bid_count, auction_id))
+        index = len(self.heap) - 1
+        self.auction_map[auction_id] = (bid_count, index)
+        self._heapify_up(index)
 
     def update_bidders(self, auction_id: str, new_bid_count: int) -> None:
         """Aktualisiert die Gebotsanzahl einer existierenden Auktion im Heap.
@@ -81,8 +80,15 @@ class MaxHeap:
         if auction_id not in self.auction_map:
             raise ValueError("Auktion existiert nicht")
 
-        # TODO:
-        raise NotImplementedError
+        # Position über die Hash-Map in O(1) finden (statt O(n) Suche im Heap)
+        _, index = self.auction_map[auction_id]
+        self.heap[index] = (new_bid_count, auction_id)
+        self.auction_map[auction_id] = (new_bid_count, index)
+
+        # Je nach Änderung muss das Element hoch oder runter wandern: O(log n)
+        self._heapify_up(index)
+        _, new_index = self.auction_map[auction_id]
+        self._heapify_down(new_index)
 
     def remove(self, auction_id: str) -> None:
         """Entfernt eine Auktion aus dem Max-Heap.
@@ -99,8 +105,26 @@ class MaxHeap:
         if auction_id not in self.auction_map:
             raise ValueError("Auktion existiert nicht")
 
-        # TODO:
-        raise NotImplementedError
+        _, index = self.auction_map[auction_id]
+        last = len(self.heap) - 1
+
+        if index == last:
+            # Letztes Element: einfach entfernen
+            self.heap.pop()
+            del self.auction_map[auction_id]
+            return
+
+        # Mit dem letzten Element tauschen, entfernen und Heap-Eigenschaft reparieren
+        self._swap(index, last)
+        self.heap.pop()
+        del self.auction_map[auction_id]
+
+        self._heapify_up(index)
+        # Nach heapify_up kann das Element an anderer Stelle stehen
+        moved_id = self.heap[index][1] if index < len(self.heap) else None
+        if moved_id is not None:
+            _, cur_index = self.auction_map[moved_id]
+            self._heapify_down(cur_index)
 
     def get_auction_with_max_bidders(self) -> Optional[Tuple[int, str]]:
         """Gibt die Auktion mit den meisten Geboten an der Spitze des Heaps zurück.
@@ -144,8 +168,11 @@ class MaxHeap:
             i: Index der ersten Auktion im Max-Heap.
             j: Index der zweiten Auktion im Max-Heap.
         """
-        # TODO:
-        raise NotImplementedError
+        self.heap[i], self.heap[j] = self.heap[j], self.heap[i]
+        count_i, id_i = self.heap[i]
+        count_j, id_j = self.heap[j]
+        self.auction_map[id_i] = (count_i, i)
+        self.auction_map[id_j] = (count_j, j)
 
     def _heapify_up(self, index: int) -> None:
         """ Führt das Heapify-Up-Verfahren durch, um die Heap-Eigenschaft nach oben hin wiederherzustellen.
@@ -153,8 +180,13 @@ class MaxHeap:
         Args:
             index: Der Index des Elements, das nach oben "heapified" werden soll.
         """
-        # TODO:
-        raise NotImplementedError
+        while index > 0:
+            parent = (index - 1) // 2
+            if self.heap[index][0] > self.heap[parent][0]:
+                self._swap(index, parent)
+                index = parent
+            else:
+                break
 
     def _heapify_down(self, index: int) -> None:
         """ Führt das Heapify-Down-Verfahren durch, um die Heap-Eigenschaft nach unten hin wiederherzustellen.
@@ -162,5 +194,18 @@ class MaxHeap:
         Args:
             index: Der Index des Elements, das nach unten "heapified" werden soll.
         """
-        # TODO:
-        raise NotImplementedError
+        n = len(self.heap)
+        while True:
+            left = 2 * index + 1
+            right = 2 * index + 2
+            largest = index
+
+            if left < n and self.heap[left][0] > self.heap[largest][0]:
+                largest = left
+            if right < n and self.heap[right][0] > self.heap[largest][0]:
+                largest = right
+
+            if largest == index:
+                break
+            self._swap(index, largest)
+            index = largest
