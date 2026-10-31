@@ -57,7 +57,7 @@ class Auctions(dict):
 
         # für erstes Praktikum auf None setzen und für 2. Praktikum auf MaxHeap()
         try:
-            self._heap: Optional[MaxHeap] = None  # zweite Praktikum MaxHeap
+            self._heap: Optional[MaxHeap] = MaxHeap()  # None
         except NotImplementedError:
             self._heap = None
 
@@ -66,13 +66,18 @@ class Auctions(dict):
         #  mit dem Sie andere Nutzer bewerten können. das wird alles simuliert in simulator.py. Sie können von jedem
         #  User über die Methode user.User.get_rating_stars_mean() die mittlere Anzahl Sterne abfragen.
         #  Nach jeder Bewertung muss die Datenstruktur aktualisiert werden, s. simulator.Simulator.randomly_rate_users().
-        self._heap_users_rated: Optional[Any] = None
+        self._heap_users_rated: Optional[MaxHeap] = MaxHeap()
 
         # 1024 Buckets: in 30 Minuten entstehen einige hundert Transaktionen. Bei nur 128 Buckets wären ab der
         # 129. Transaktion Kollisionen unvermeidbar und der Effekt einer besseren Hashfunktion kaum sichtbar.
         self._transactions: Transactions = Transactions(1024)
 
         self._users: marketplace.users.Users = marketplace.users.Users("user.csv")
+
+
+        # Praktikum 2: alle Nutzer mit ihrer aktuellen mittleren Sternezahl in den Max-Heap einfügen
+        for user_id, user in self._users.items():
+            self._heap_users_rated.add_auction(user_id, user.get_rating_stars_mean())
 
         self._read_auctions_from_csvfile(csvfile)
 
@@ -640,28 +645,21 @@ class Auctions(dict):
         Raises:
             None
         """
-        # TODO for students: do not use this part
-        # stupid brute force implementation
-        max_user: Optional[str] = None
-        max_stars: float = 0.0
-        for user_id, user in self._users.items():
-            stars_mean = user.get_rating_stars_mean()
-            if stars_mean > max_stars:
-                max_stars = stars_mean
-                max_user = user_id
+        # Praktikum 2: statt alle Nutzer in O(n) zu durchlaufen, steht der beste Verkäufer
+        # an der Spitze des Max-Heaps und kann in O(1) abgelesen werden.
+        if not self._heap_users_rated:
+            return None
+
+        top = self._heap_users_rated.get_auction_with_max_bidders()   # (mittlere Sterne, user_id)
+
+        # solange noch niemand bewertet wurde, gibt es keinen besten Verkäufer (wie vorher: user = None)
+        if top is None or top[0] <= 0:
+            return [0.0, None] if with_num_stars else None
 
         if with_num_stars:
-            return [max_stars, max_user]
+            return [top[0], top[1]]
         else:
-            return max_user
-
-        # TODO for students: instead use and probably change this
-        # if not self._heap_users_rated:
-        #     return None
-        # if with_num_stars:
-        #     return self._heap_users_rated.get_top_user()
-        # else:
-        #     return self._heap_users_rated.get_top_user()[1]
+            return top[1]
 
     def get_active_auctions(self) -> Dict[str, marketplace.auction.Auction]:
         """Gibt alle nicht abgewickelten/nicht verkauften Auktionen zurück.
@@ -727,9 +725,6 @@ class Auctions(dict):
 
                 # self.add_new_auction(user_id, item_name, description, float(value_min))
                 item = marketplace.item.Item(item_name, description, float(value_min))
-
-                #ADT map , weil wert über schlüssel gefunden wird
-                #Datenstruktur: Hashtabelle
                 auction, auction_id = self._new_auction(user_id, item)
 
                 auctions[auction_id] = auction
@@ -793,7 +788,7 @@ class Auctions(dict):
 
         self._my_simulator.create_random_auctions(self, current_user_id)
 
-        self._my_simulator.randomly_rate_users(self._users, current_user_id)
+        self._my_simulator.randomly_rate_users(self._users, current_user_id, self._heap_users_rated)
 
         next_elapsed = elapsed_seconds + 30
         if next_elapsed < max_duration:
