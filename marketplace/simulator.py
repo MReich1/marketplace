@@ -126,7 +126,7 @@ class Simulator:
             users[random_user].rate_user(stars)
             if(heap_users_rated is not None):
                 new_mean = users[random_user].get_rating_stars_mean()
-                if (random_user not in heap_users_rated.auctions_map):
+                if (random_user not in heap_users_rated.auction_map):
                     heap_users_rated.add_auction(random_user, new_mean)
                 else:
                     heap_users_rated.update_bidders(random_user,new_mean)

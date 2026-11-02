@@ -17,6 +17,10 @@ Passwortüberprüfung, Freundschaftsempfehlung, Abstands- und Verbindungsberechn
 from typing import Any, Dict, List, Optional, Tuple, Union
 import ast
 import csv
+
+import networkx as nx
+import osmnx as ox
+
 import marketplace.user
 import marketplace.praktikumsgruppen
 
@@ -77,7 +81,38 @@ class Users(marketplace.praktikumsgruppen.Praktikumsgruppen):
         """
         # TODO for students: calculate distance between gps coordinates of user1 and user2 using a map and an
         #  algorithm that calculates the shortest distance on the map
+        # 1. Graph einmalig laden
+        if not hasattr(self,"_map_graph") or self._map_graph is None:
+            self._map_graph = ox.graph.graph_from_adress(
+                "Steinmüllerallee 1, Gummersbach, Germany",
+                dist = 5000,
+                network_type = "drive",
+            )
 
+            u1_coords = self[user_id1].gps_coords()
+            u2_coords = self[user_id2].gps_coords()
+
+            if None in u1_coords or None in u2_coords:
+                return float("inf")
+        #2 nächste knoten im graphen finden x = länge, y= breite
+        origin = ox.distance.nearest_nodes(
+            self._map_graph, u1_coords[1],u1_coords[0]
+        )
+        destination = ox.distance.nearest_nodes(
+            self._map_graph, u2_coords[1],u2_coords[0]
+        )
+        #3 kürzesten pfad berechnen
+        try:
+            shortest_path = ox.routing.shortest_path(
+                self._map_graph, origin, destination, weight="length"
+            )
+            if shortest_path is None:
+                return float("inf")
+            return float(
+                nx.path_weight(self._map_graph, shortest_path, weight="length")
+            )
+        except (nx.NetworkXNoPath, nx.NodeNotFound):
+            return float("inf")
         user1 = self[user_id1]
         user2 = self[user_id2]
 
@@ -218,11 +253,26 @@ class Users(marketplace.praktikumsgruppen.Praktikumsgruppen):
         Raises:
             KeyError: Falls `user_id` nicht existiert.
         """
+
+        #existensprüfung(key error)
+        if user_id not in self:
+            raise KeyError(f"User '{user_id}' existiert nicht.")
+
         mutual_friends_count = self.get_mutual_friends(user_id)
+
+       # current_user = self[user_id]
+
         # TODO for students: Implement this method by filling the list suggested_friends
-
-        suggested_friends = []
-
+        # Nutzer nach Anzahl gemeinsamer Freunde absteigend sortieren
+        suggested_friends = [
+            friend
+            for friend, count in sorted(
+                mutual_friends_count.items(),
+                key=lambda item: item[1],
+                reverse=True,
+            )
+            if count >= num_common_friends
+        ]
         if pretty_print:
             suggested_friends = [self[friend].pretty_print() for friend in suggested_friends]
 
@@ -244,6 +294,25 @@ class Users(marketplace.praktikumsgruppen.Praktikumsgruppen):
         """
         if user_id1 not in self or user_id2 not in self:
             return False
+        if user_id1 == user_id2:
+            return True
+
+        from collections import deque
+
+        queue = deque([(user_id1, 0)])
+        visited = {user_id1}
+
+        while queue:
+            current_id, current_degree = queue.popleft()
+
+            if current_degree < degree:
+                for friend_id in self[current_id].friends():
+                    if friend_id == user_id2:
+                        return True
+                    if friend_id not in visited and friend_id in self:
+                        visited.add(friend_id)
+                        queue.append((friend_id, current_degree + 1))
+
 
         # TODO for students: Implement this method
 

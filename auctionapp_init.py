@@ -343,7 +343,10 @@ class AuctionAppInit:
         lbl_title.grid(row=0, column=0, columnspan=3, padx=5, pady=5, sticky="ew")
         self._style_label(lbl_title, is_header=True)
 
-        self.item_listbox = tk.Listbox(self.frame_myauctions, width=110)
+        #self.item_listbox = tk.Listbox(self.frame_myauctions, width=110)
+        self.item_listbox = tk.Listbox(
+            self.frame_myauctions, width=110, exportselection=False
+        )
         self.item_listbox.grid(row=1, column=0, rowspan=7, columnspan=3, padx=5, pady=5, sticky="nsew")
         self.item_listbox.bind('<<ListboxSelect>>', self.on_item_listbox_select)
         self._style_listbox(self.item_listbox)
@@ -478,8 +481,14 @@ class AuctionAppInit:
         lbl_all.grid(row=0, column=0, columnspan=12, padx=5, pady=5, sticky="ew")
         self._style_label(lbl_all, is_header=True)
 
-        self.all_items_listbox = tk.Listbox(self.frame, width=140, height=30,
-                                            yscrollcommand=self.scrollbar.set)
+        #self.all_items_listbox = tk.Listbox(self.frame, width=140, height=30,yscrollcommand=self.scrollbar.set)
+        self.all_items_listbox = tk.Listbox(
+            self.frame,
+            width=140,
+            height=30,
+            exportselection=False,
+            yscrollcommand=self.scrollbar.set,
+        )
         self._style_listbox(self.all_items_listbox)
         # Bind the <<ListboxSelect>> event to the on_listbox_select function
         self.all_items_listbox.bind('<<ListboxSelect>>', self.on_listbox_select)
@@ -585,6 +594,24 @@ class AuctionAppInit:
             self._style_button(self.bid_btn)
             ToolTip(self.bid_btn, "Gebot für die ausgewählte Auktion abgeben")
 
+
+
+
+            # Eingabe für Sterne (1 bis 5)
+            self.rate_entry = ttk.Combobox(
+                self.frame_auction_detail,
+                values=["1", "2", "3", "4", "5"],
+                width=3,
+                state="readonly",
+            )
+            self.rate_entry.set(5)
+            self.rate_entry.grid(row=5, column=0, padx=5, pady=5, sticky="w")
+
+            # Button zum Bewerten
+            self.rate_btn = tk.Button(self.frame_auction_detail, text="Verkäufer bewerten", command=self.rate_seller)
+            self.rate_btn.grid(row=5, column=1, padx=5, pady=5, sticky="ew")
+            self._style_button(self.rate_btn)
+
     def create_widgets(self) -> None:
         """Erstellt alle untergeordneten Widgets und Frames der Benutzeroberfläche.
 
@@ -664,7 +691,9 @@ class AuctionAppInit:
         Returns:
             None
         """
-        self.create_frame_auction_detail(listbox="all_items")
+        #self.create_frame_auction_detail(listbox="all_items")
+        if self.all_items_listbox.curselection():
+            self.create_frame_auction_detail(listbox="all_items")
 
     def on_friends_listbox_select(self, event: tk.Event) -> None:
         """Event-Handler bei Auswahl eines Freundes in der Freundesliste.
@@ -693,6 +722,8 @@ class AuctionAppInit:
         """
         # Get the selected index
         selected_index = self.item_listbox.curselection()
+        if not selected_index:
+            return
         value = self.view_option.get()
 
         if selected_index and value == 'offered':
@@ -988,6 +1019,98 @@ class AuctionAppInit:
                     self._auctions[auction_id].get_item_name()))
         else:
             print('place_bid fails: ', bid_amount, selected, is_all_items_listbox, value)
+
+    def rate_seller(self) -> None:
+        """Verarbeitet die Bewertung für den Verkäufer der ausgewählten Auktion."""
+        if self._current_user is None:
+            return
+
+        selected = self.all_items_listbox.curselection()
+        value = self.view_option.get()
+        is_all_items_listbox = True
+
+        if (selected is None or len(selected) == 0) and (value in ('recommended', 'bids')):
+            selected = self.item_listbox.curselection()
+            is_all_items_listbox = False
+
+        if not selected:
+            messagebox.showwarning("Hinweis", "Bitte wählen Sie zuerst eine Auktion aus.")
+            return
+
+        if is_all_items_listbox:
+            auction_desc = self.all_items_listbox.get(selected)
+        else:
+            auction_desc = self.item_listbox.get(selected)
+
+        auction_id = marketplace.auction.Auction.get_id_from_pretty_print(auction_desc)
+        seller_id = self._auctions.get_seller_id(auction_id)
+
+        if seller_id == self._current_user.id():
+            messagebox.showerror("Fehler", "Sie können sich nicht selbst bewerten.")
+            return
+
+        try:
+            stars = int(self.rate_entry.get())
+            if not 1 <= stars <= 5:
+                raise ValueError
+        except (ValueError, AttributeError):
+            messagebox.showerror("Fehler", "Bitte eine ganze Zahl von 1 bis 5 eingeben.")
+            return
+
+        seller = self._users.get(seller_id) if hasattr(self._users, "get") else self._users[seller_id]
+        if hasattr(seller, "rate"):
+            seller.rate(stars)
+        elif hasattr(seller, "add_rating"):
+            seller.add_rating(stars)
+
+        #new_rating = seller.get_rating() if hasattr(seller, "get_rating") else seller.rating()
+       # for method_name in ("rate", "add_rating", "set_rating"):
+        #    if hasattr(seller, method_name):
+         #       getattr(seller, method_name)(stars)
+          #      break
+        #heap = getattr(self._auctions, "heap_users_rated", getattr(self._auctions, "_heap_users_rated", None))
+        #if heap is not None and hasattr(heap, "update_bidders"):
+        #    heap.update_bidders(seller_id, new_rating)
+
+        #self.system_messages.push(f"Verkäufer {seller_id} erfolgreich mit {stars} Sternen bewertet.")
+
+            # 1. Bewertung am User vermerken (falls Methode in user.py existiert)
+            for method_name in ("rate", "add_rating", "set_rating"):
+                if hasattr(seller, method_name):
+                    getattr(seller, method_name)(stars)
+                    break
+
+            # 2. Rating auslesen (falls vorhanden, sonst Fallback auf eingegebene Sterne)
+            new_rating = float(stars)
+            for attr_name in (
+                    "get_rating",
+                    "rating",
+                    "get_average_rating",
+                    "average_rating",
+            ):
+                if hasattr(seller, attr_name):
+                    val = getattr(seller, attr_name)
+                    new_rating = val() if callable(val) else val
+                    break
+
+            # 3. Heap aktualisieren (falls vorhanden)
+            heap = getattr(
+                self._auctions,
+                "heap_users_rated",
+                getattr(self._auctions, "_heap_users_rated", None),
+            )
+            if heap is not None and hasattr(heap, "update_bidders"):
+                try:
+                    heap.update_bidders(seller_id, new_rating)
+                except Exception as e:
+                    print(f"Heap-Update übersprungen: {e}")
+
+            self.system_messages.push(
+                f"Verkäufer {seller_id} erfolgreich mit {stars} Sternen bewertet."
+            )
+
+
+
 
     def show_suggestions(self, event: tk.Event) -> None:
         """Zeigt Autovervollständigungsvorschläge für das Suchfeld an.
