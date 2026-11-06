@@ -27,7 +27,23 @@ class Users(marketplace.praktikumsgruppen.Praktikumsgruppen):
     Attributes:
         _groupnumbers (List[int]): Liste der Gruppennummern der eingelesenen Benutzer.
     """
+    _map_graph = None
 
+    @classmethod
+    def get_map_graph(cls):
+        """Lädt den OSMnx-Straßengraphen einmalig und speichert/lädt ihn lokal."""
+        if cls._map_graph is None:
+            import os
+            import osmnx as ox
+            graph_file = "nrw_driving_graph.graphml"
+            if os.path.exists(graph_file):
+                cls._map_graph = ox.load_graphml(graph_file)
+            else:
+                cls._map_graph = ox.graph.graph_from_address(
+                    'Steinmüllerallee 1, Gummersbach, Germany', dist=50000, network_type='drive'
+                )
+                ox.save_graphml(cls._map_graph, graph_file)
+        return cls._map_graph
     # *** CONSTRUCTORS ***
     def __init__(self, csvfile: str, *args: Any) -> None:
         """Initialisiert das Users-Objekt und liest Daten aus CSV-Dateien ein.
@@ -66,25 +82,33 @@ class Users(marketplace.praktikumsgruppen.Praktikumsgruppen):
         self[user_id] = marketplace.user.User(user_id, password, name_family, name_first, gps_coord, address)
 
     def calc_distance_between_users(self, user_id1: str, user_id2: str) -> float:
-        """Calculates distance between GPS coordinates of two users.
-
-        Args:
-            user_id1 (str): First user ID.
-            user_id2 (str): Second user ID.
-
-        Returns:
-            float: Calculated distance between the two users.
-        """
-        # TODO for students: calculate distance between gps coordinates of user1 and user2 using a map and an
-        #  algorithm that calculates the shortest distance on the map
+        """Calculates distance between GPS coordinates of two users."""
+        import networkx as nx
+        import osmnx as ox
 
         user1 = self[user_id1]
         user2 = self[user_id2]
+        
+        coord1 = user1.gps_coords()
+        coord2 = user2.gps_coords()
 
-        # TODO for students: replace this naive implementation of manhattan distance with distance gotten
-        #  from graph algorithm
-        distance = sum(abs(a - b) for a, b in zip(user1.gps_coords(), user2.gps_coords()))
-        return float(distance)
+        if not coord1 or not coord2 or coord1[0] is None or coord2[0] is None:
+            return float('inf')
+
+        lat1, lon1 = coord1
+        lat2, lon2 = coord2
+
+        graph = Users.get_map_graph()
+
+        origin = ox.distance.nearest_nodes(graph, lon1, lat1)
+        destination = ox.distance.nearest_nodes(graph, lon2, lat2)
+
+        try:
+            shortest_path = ox.routing.shortest_path(graph, origin, destination, weight='length')
+            distance_m = nx.path_weight(graph, shortest_path, weight='length')
+            return float(distance_m / 1000.0)  # in Kilometern
+        except (nx.NetworkXNoPath, KeyError):
+            return float('inf')
 
     # *** PUBLIC GET methods ***
 
@@ -201,51 +225,65 @@ class Users(marketplace.praktikumsgruppen.Praktikumsgruppen):
 
     def suggest_friends(self, user_id: str, num_common_friends: int = 2,
                         distance_threshold: float = 0.1, pretty_print: bool = True) -> List[str]:
-        """Suggests users to the given user_id that
-        (1) are friends with at least num_common_friends friends of user_id or
-        (2) that live nearby the given user_id (closer as distance_threshold) and are friends of friends of friends...
-        (see are_users_connected())
+        """Suggests users to the given user_id..."""
+        if user_id not in self:
+            raise KeyError(f"User {user_id} does not exist.")
 
-        Args:
-            user_id (str): usually the current user id
-            num_common_friends (int): only suggest users that are at least friends with two of the user_ids friends
-            distance_threshold (float): only suggest users that live closer to the given user_id as this threshold value
-            pretty_print (bool): if True, then call pretty_print() on all suggested friends before returning them
-
-        Returns:
-            List[str]: list of suggested friends. the first part of the list should contain common friends, ordered so that users with maximum number of common friends appear first. the second part of the list should contain all users that live close by, again sorted, so that the direct neighbour comes first.
-
-        Raises:
-            KeyError: Falls `user_id` nicht existiert.
-        """
+        user_friends = set(self[user_id].friends())
         mutual_friends_count = self.get_mutual_friends(user_id)
-        # TODO for students: Implement this method by filling the list suggested_friends
 
-        suggested_friends = []
+        common_candidates = [
+            (uid, count) for uid, count in mutual_friends_count.items()
+            if count >= num_common_friends and uid not in user_friends and uid != user_id
+        ]
+        common_candidates.sort(key=lambda x: x[1], reverse=True)
+        part1_users = [uid for uid, _ in common_candidates]
+        part1_set = set(part1_users)
+
+        nearby_candidates = []
+        for other_id in self.keys():
+            if other_id == user_id or other_id in user_friends or other_id in part1_set:
+                continue
+
+            if self.are_users_connected(user_id, other_id, degree=3):
+                dist = self.calc_distance_between_users(user_id, other_id)
+                if dist < distance_threshold:
+                    nearby_candidates.append((other_id, dist))
+
+        nearby_candidates.sort(key=lambda x: x[1])
+        part2_users = [uid for uid, _ in nearby_candidates]
+
+        suggested_user_ids = part1_users + part2_users
 
         if pretty_print:
-            suggested_friends = [self[friend].pretty_print() for friend in suggested_friends]
+            return [self[uid].pretty_print() for uid in suggested_user_ids]
 
-        return suggested_friends
+        return suggested_user_ids
 
     def are_users_connected(self, user_id1: str, user_id2: str, degree: int = 3) -> bool:
-        """Prüft mittels Breitensuche, ob zwei Benutzer über Freundschaftskanten verbunden sind.
-
-        Args:
-            user_id1 (str): a user that we are searching a friend for
-            user_id2 (str): another user, where we want to check whether it is somehow friends with user_id1 over some other shared friends
-            degree (int): only look for possible friend connections up to this degree of friendship. Defaults to 3.
-
-        Returns:
-            bool: True, if user_id1 and user_id2 are friends over some edges up to the given degree, else False
-
-        Raises:
-            None
-        """
+        """Prüft mittels Breitensuche, ob zwei Benutzer über Freundschaftskanten verbunden sind."""
         if user_id1 not in self or user_id2 not in self:
             return False
+        if user_id1 == user_id2:
+            return True
 
-        # TODO for students: Implement this method
+        from collections import deque
+
+        queue = deque([(user_id1, 0)])
+        visited = {user_id1}
+
+        while queue:
+            current_id, current_degree = queue.popleft()
+
+            if current_degree >= degree:
+                continue
+
+            for friend_id in self[current_id].friends():
+                if friend_id == user_id2:
+                    return True
+                if friend_id not in visited:
+                    visited.add(friend_id)
+                    queue.append((friend_id, current_degree + 1))
 
         return False
 
