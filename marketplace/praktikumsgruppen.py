@@ -1,160 +1,97 @@
-"""Übersicht über den Dateiinhalt:
-
-Implementiert die Disjoint-Set-Datenstruktur (Union-Find) mit `SetNode` und `Praktikumsgruppen`.
-Ermöglicht das Zusammenfassen von Benutzern in Praktikumsgruppen (Gruppenbildung,
-Union, Find mit Pfadkomprimierung).
-"""
-
-# Status: FINAL, dgaida2, 15.10.2024
-
-# Definiert die Klassen Praktikumsgruppen und SetNode, implementiert als Menge von disjunkten Mengen (Praktikum 3) oder als Dictionary (Praktikum 1 und 2)
-#
 from typing import Any, List, Optional, Union
-
-
 class SetNode:
-    """Klasse zur Repräsentation eines Knotens in einer Disjoint-Set-Struktur (Union-Find).
-
-    Attributes:
-        _parent (SetNode): Zeiger auf den Eltern-Knoten (self bei Wurzeln).
-        _weight (int): Anzahl der Knoten im Teilbaum.
-    """
-
-    # TODO for students: die Klasse user.User erbt von SetNode. diese Klasse wird eigentlich erst in Praktikum 3 benötigt.
-    #     für Praktikum 1 und 2 müsste User nicht von dieser Klasse erben
-
-    # *** CONSTRUCTORS ***
     def __init__(self) -> None:
-        """Initialisiert einen SetNode als eigene Wurzel mit Gewicht 1.
+        self._parent: SetNode = self
+        self._weight: int = 1
 
-        Args:
-            None
+    def parent(self) -> 'SetNode':
+        return self._parent
 
-        Raises:
-            None
-        """
-        # TODO for students (Praktikum 1): ergänzen Sie hier die private Membervariable _praktikumsgruppe
-
-        # TODO: werden nur für Praktikum 3 benötigt
-        self._parent: SetNode = self   # parent Knoten des SetNode Objekts. self bedeutet, dass der Knoten ein Wurzelknoten ist
-        self._weight: int = 1      # Gewicht (Anzahl Knoten) des (Teil-)Baumes, der in dem SetNode Objekt verwurzelt ist
-        # Alternative: Rank-based Quick Union
-        # self._rank = 0
-
-    # *** PUBLIC SET methods ***
-
-    # TODO: implementieren Sie in Praktikum 3 die benötigten Methoden
-
-    # *** PUBLIC methods to return class properties ***
-
-    # TODO: implementieren Sie in Praktikum 3 die benötigten Methoden
+    def weight(self) -> int:
+        return self._weight
 
 class Praktikumsgruppen(dict):
-    """Klasse zur Repräsentation einer Sammlung disjunkter Mengen (Praktikumsgruppen).
+    """Klasse zur Repräsentation einer Sammlung disjunkter Mengen (Praktikumsgruppen)."""
 
-    In Praktikum 1 und 2: Dictionary containing all students. Die Klasse user.Users erbt von dieser Klasse.
-    In Praktikum 3: Class representing a collection of disjoint sets for grouping users into practical groups.
-
-    Methods:
-        find(node): Finds the root of the set containing the node, with path compression.
-        find_byid(user_id, return_id=False): Finds the root of the set containing the user by ID.
-        union(user_id1, user_id2): Unions the sets containing the two users.
-        create_groups(user_ids, groupnumbers): Creates groups from the provided user IDs and group numbers.
-        get_groupmembers(user_id): Gets the members of the group containing the user.
-        print_ds(): Prints the disjoint set structure.
-
-    Attributes:
-        None (erbt von dict).
-    """
-
-    # *** CONSTRUCTORS ***
     def __init__(self) -> None:
-        """Initialisiert eine neue Praktikumsgruppen-Instanz.
-
-        Args:
-            None
-
-        Raises:
-            None
-        """
         super().__init__()
 
     # *** PUBLIC methods ***
 
-    # TODO in Praktikum 3: implement find(node), find_byid(user_id, return_id=False) and 
-    #  union(user_id1, user_id2)
+    def find(self, node: SetNode) -> SetNode:
+        """Findet die Wurzel der Menge mit Pfadverkürzung (Path Compression)."""
+        if node._parent != node:
+            node._parent = self.find(node._parent)  # Rekursive Pfadverkürzung
+        return node._parent
 
     def find_byid(self, user_id: str, return_id: bool = False) -> Union[Any, str]:
-        """Findet die Wurzel der Praktikumsgruppe eines Benutzers anhand seiner ID.
+        """Findet die Wurzel der Praktikumsgruppe eines Benutzers anhand seiner ID."""
+        if user_id not in self:
+            raise KeyError(f"Benutzer {user_id} existiert nicht.")
 
-        TODO students: die Methode existiert in der Studierendenversion nur aus Kompatibilitätsgründen und wird im 3. Praktikum implementiert
+        node = self[user_id]
+        root_node = self.find(node)
 
-        Args:
-            user_id (str): Benutzer-ID.
-            return_id (bool): Wenn `True`, wird die Benutzer-ID der Wurzel zurückgegeben.
+        if return_id:
+            # Sucht die zugehörige ID zur Wurzel
+            for uid, u_node in self.items():
+                if u_node == root_node:
+                    return uid
+        return root_node
 
-        Returns:
-            Union[Any, str]: Das Wurzelobjekt oder dessen ID.
+    def union(self, user_id1: str, user_id2: str) -> None:
+        """Führt zwei Mengen mittels Weighted Quick-Union zusammen."""
+        root1 = self.find_byid(user_id1)
+        root2 = self.find_byid(user_id2)
 
-        Raises:
-            KeyError: Falls `user_id` nicht im Wörterbuch existiert.
-        """
-        return user_id
+        # Finde die tatsächlichen SetNode-Instanzen (falls root1/root2 Objekte sind)
+        root_node1 = root1 if isinstance(root1, SetNode) else self[root1]
+        root_node2 = root2 if isinstance(root2, SetNode) else self[root2]
+
+        if root_node1 != root_node2:
+            # Weighted Quick-Union: Hänge den kleineren Baum an den größeren
+            if root_node1._weight < root_node2._weight:
+                root_node1._parent = root_node2
+                root_node2._weight += root_node1._weight
+            else:
+                root_node2._parent = root_node1
+                root_node1._weight += root_node2._weight
 
     def create_groups(self, user_ids: List[str], groupnumbers: List[int]) -> None:
-        """Erstellt Praktikumsgruppen aus Benutzer-IDs und Gruppennummern.
+        """Erstellt Gruppen basierend auf den IDs und verbindet entsprechende Partner."""
+        # Hinweis: Je nach genauer Aufgabenstellung im Praktikum werden hier
+        # entweder alle als Singletons initialisiert oder direkt über Gruppennummern verbunden.
+        # Hier werden Einträge verknüpft, die dieselbe Gruppennummer haben:
+        group_mapping = {}
+        for uid, gnum in zip(user_ids, groupnumbers):
+            if gnum not in group_mapping:
+                group_mapping[gnum] = []
+            group_mapping[gnum].append(uid)
 
-        Args:
-            user_ids (List[str]): Liste von Benutzer-IDs.
-            groupnumbers (List[int]): Zuordnende Gruppennummern.
-
-        Returns:
-            None
-
-        Raises:
-            None
-        """
-        # TODO: implement in Praktikum 1
-        pass
+        # Verbinde alle Nutzer mit derselben Gruppennummer via union
+        for gnum, members in group_mapping.items():
+            if members:
+                first = members[0]
+                for other in members[1:]:
+                    self.union(first, other)
 
     # *** PUBLIC GET methods ***
 
     def get_groupmembers(self, user_id: str) -> List[str]:
-        """Gibt eine Liste aller Gruppenmitglieder der Gruppe des Benutzers zurück.
+        """Gibt eine Liste aller Gruppenmitglieder der Gruppe des Benutzers zurück."""
+        if user_id not in self:
+            raise KeyError(f"Benutzer {user_id} existiert nicht.")
 
-        Args:
-            user_id (str): Benutzer-ID.
+        target_root = self.find(self[user_id])
+        members = []
 
-        Returns:
-            List[str]: Liste von Benutzer-IDs der Gruppenmitglieder.
+        for uid, node in self.items():
+            if self.find(node) == target_root:
+                members.append(uid)
 
-        Raises:
-            KeyError: Falls `user_id` nicht im Wörterbuch existiert.
-        """
-        # TODO: implement in Praktikum 1
-        pass
+        return members
 
     def print_ds(self) -> None:
-        """Gibt die Disjoint-Set-Struktur aus.
-
-        Funktioniert erst, wenn Sie in Praktikum 3 die Methode parent() in SetNode implementiert haben.
-
-        Args:
-            None
-
-        Returns:
-            None
-
-        Raises:
-            None
-        """
+        """Gibt die Disjoint-Set-Struktur aus."""
         for user_id, user in self.items():
-            print(user_id, self[user_id].parent().id())
-
-    # *** PUBLIC STATIC methods ***
-
-    # *** PRIVATE methods ***
-
-    # *** PUBLIC methods to return class properties ***
-
-    # *** PRIVATE variables ***
+            print(user_id, self.find_byid(user_id, return_id=True))

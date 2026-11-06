@@ -145,4 +145,5 @@ class AuctionApp(AuctionAppInit):
 if __name__ == "__main__":
     root = tk.Tk()
     app = AuctionApp(root)
+    app._users.calc_distance_between_users("gleone", "mreich1")
     root.mainloop()

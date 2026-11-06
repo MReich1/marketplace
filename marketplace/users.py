@@ -40,7 +40,7 @@ class Users(marketplace.praktikumsgruppen.Praktikumsgruppen):
                 cls._map_graph = ox.load_graphml(graph_file)
             else:
                 cls._map_graph = ox.graph.graph_from_address(
-                    'Steinmüllerallee 1, Gummersbach, Germany', dist=50000, network_type='drive'
+                    'Steinmüllerallee 1, Gummersbach, Germany', dist=5000, network_type='drive'
                 )
                 ox.save_graphml(cls._map_graph, graph_file)
         return cls._map_graph
