@@ -28,9 +28,9 @@ import osmnx as ox
 from shapely.geometry import box
 
 # Straßengraph: wird einmal heruntergeladen und danach nur noch lokal geladen
-GRAPH_FILE = "nrw_main_roads.graphml"
+GRAPH_FILE = "nrw_motorways.graphml"
 # nur größere Straßen, damit der Graph für ganz NRW klein genug bleibt
-ROAD_FILTER = '["highway"~"motorway|motorway_link|trunk|trunk_link|primary|primary_link"]'
+ROAD_FILTER = '["highway"~"motorway|motorway_link|trunk|trunk_link"]'
 
 
 class Users(marketplace.praktikumsgruppen.Praktikumsgruppen):
@@ -113,7 +113,11 @@ class Users(marketplace.praktikumsgruppen.Praktikumsgruppen):
                 lons = [user.gps_coords()[1] for user in self.values()]
                 margin = 0.1
                 area = box(min(lons) - margin, min(lats) - margin, max(lons) + margin, max(lats) + margin)
-
+                # Overpass-Server überlastet: anderer Server und kleinere Teilanfragen
+                ox.settings.overpass_url = "https://maps.mail.ru/osm/tools/overpass/api"
+                ox.settings.overpass_rate_limit = False
+                ox.settings.requests_timeout = 600
+                ox.settings.max_query_area_size = 25_000_000_000   # 25.000 km² pro Teilanfrage
                 graph = ox.graph_from_polygon(area, custom_filter=ROAD_FILTER)
                 # nur der größte zusammenhängende Teil, sonst gibt es Knoten ohne Weg zu den anderen
                 graph = ox.truncate.largest_component(graph, strongly=True)
