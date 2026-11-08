@@ -17,6 +17,7 @@ import marketplace.simulator
 from marketplace.max_heap import MaxHeap
 from marketplace.transactions import Transaction, Transactions
 from datetime import datetime
+import math
 import random
 import threading
 import csv
@@ -422,6 +423,16 @@ class Auctions(dict):
         """
         return [auction_id for auction_id, auction in list(self.items())
                 if auction.seller_id() == user_id and not auction.sold()]
+
+    def get_portofee(self, auction_id: str, user_id: str) -> Optional[float]:
+        """Porto für die Lieferung vom Verkäufer der Auktion an user_id (None, wenn kein Weg gefunden wurde)."""
+        seller_id = self[auction_id].seller_id()
+        if seller_id not in self._users:        # z. B. Verkäufer ohne Wohnort
+            return None
+        distance_km = self._users.calc_distance_between_users(seller_id, user_id)
+        if math.isinf(distance_km):
+            return None
+        return marketplace.auction.Auction.calculate_portofee(distance_km)
 
     def get_auctions_bid_in(self, user_id: str) -> List[str]:
         """Gibt alle Auktions-IDs zurück, in denen der Benutzer mitbietet.

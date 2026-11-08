@@ -20,6 +20,18 @@ import csv
 import marketplace.user
 import marketplace.praktikumsgruppen
 
+from collections import deque
+
+import os
+import networkx as nx
+import osmnx as ox
+from shapely.geometry import box
+
+# Straßengraph: wird einmal heruntergeladen und danach nur noch lokal geladen
+GRAPH_FILE = "nrw_main_roads.graphml"
+# nur größere Straßen, damit der Graph für ganz NRW klein genug bleibt
+ROAD_FILTER = '["highway"~"motorway|motorway_link|trunk|trunk_link|primary|primary_link"]'
+
 
 class Users(marketplace.praktikumsgruppen.Praktikumsgruppen):
     """Klasse zur Verwaltung aller registrierten Benutzer und ihrer Freundschaften.
@@ -40,6 +52,9 @@ class Users(marketplace.praktikumsgruppen.Praktikumsgruppen):
             FileNotFoundError: Falls die CSV-Datei nicht gefunden wurde.
         """
         super().__init__()
+
+        self._map_graph = None      # Straßengraph, wird erst bei der ersten Distanzberechnung geladen
+        self._node_of_user = {}     # Cache: user_id -> nächster Knoten im Straßengraphen
 
         self._read_users_from_csvfile(csvfile)
         self._read_friends_csv('friends.csv')
@@ -75,16 +90,43 @@ class Users(marketplace.praktikumsgruppen.Praktikumsgruppen):
         Returns:
             float: Calculated distance between the two users.
         """
-        # TODO for students: calculate distance between gps coordinates of user1 and user2 using a map and an
-        #  algorithm that calculates the shortest distance on the map
+        graph = self._get_map_graph()
+        origin = self._nearest_node(user_id1)
+        destination = self._nearest_node(user_id2)
 
-        user1 = self[user_id1]
-        user2 = self[user_id2]
+        try:
+            # Dijkstra auf dem Straßengraphen, Kantengewicht = Länge des Straßenstücks in Metern
+            distance_m = nx.shortest_path_length(graph, origin, destination, weight='length')
+        except nx.NetworkXNoPath:
+            return float('inf')
 
-        # TODO for students: replace this naive implementation of manhattan distance with distance gotten
-        #  from graph algorithm
-        distance = sum(abs(a - b) for a, b in zip(user1.gps_coords(), user2.gps_coords()))
-        return float(distance)
+        return distance_m / 1000.0  # in Kilometern
+
+    def _get_map_graph(self) -> nx.MultiDiGraph:
+        """Lädt den Straßengraphen. Beim allerersten Aufruf wird er heruntergeladen und als Datei gespeichert."""
+        if self._map_graph is None:
+            if os.path.exists(GRAPH_FILE):
+                self._map_graph = ox.load_graphml(GRAPH_FILE)
+            else:
+                # Rechteck um alle Wohnorte (+ etwa 10 km Rand), damit jeder Nutzer im Graphen liegt
+                lats = [user.gps_coords()[0] for user in self.values()]
+                lons = [user.gps_coords()[1] for user in self.values()]
+                margin = 0.1
+                area = box(min(lons) - margin, min(lats) - margin, max(lons) + margin, max(lats) + margin)
+
+                graph = ox.graph_from_polygon(area, custom_filter=ROAD_FILTER)
+                # nur der größte zusammenhängende Teil, sonst gibt es Knoten ohne Weg zu den anderen
+                graph = ox.truncate.largest_component(graph, strongly=True)
+                ox.save_graphml(graph, GRAPH_FILE)
+                self._map_graph = graph
+        return self._map_graph
+
+    def _nearest_node(self, user_id: str) -> int:
+        """Gibt den Knoten zurück, der dem Wohnort des Nutzers am nächsten liegt (mit Cache)."""
+        if user_id not in self._node_of_user:
+            lat, lon = self[user_id].gps_coords()
+            self._node_of_user[user_id] = ox.distance.nearest_nodes(self._get_map_graph(), lon, lat)
+        return self._node_of_user[user_id]
 
     # *** PUBLIC GET methods ***
 
@@ -200,7 +242,7 @@ class Users(marketplace.praktikumsgruppen.Praktikumsgruppen):
         return mutual_friends_count
 
     def suggest_friends(self, user_id: str, num_common_friends: int = 2,
-                        distance_threshold: float = 0.1, pretty_print: bool = True) -> List[str]:
+                        distance_threshold: float = 50.0, pretty_print: bool = True) -> List[str]:
         """Suggests users to the given user_id that
         (1) are friends with at least num_common_friends friends of user_id or
         (2) that live nearby the given user_id (closer as distance_threshold) and are friends of friends of friends...
@@ -219,14 +261,43 @@ class Users(marketplace.praktikumsgruppen.Praktikumsgruppen):
             KeyError: Falls `user_id` nicht existiert.
         """
         mutual_friends_count = self.get_mutual_friends(user_id)
-        # TODO for students: Implement this method by filling the list suggested_friends
+        friends = self[user_id].friends()
 
-        suggested_friends = []
+        # (1) Freunde von Freunden mit mindestens num_common_friends gemeinsamen Freunden,
+        #     absteigend nach Anzahl gemeinsamer Freunde (bei Gleichstand alphabetisch)
+        common = [(uid, count) for uid, count in mutual_friends_count.items()
+                  if count >= num_common_friends]
+        common.sort(key=lambda pair: (-pair[1], pair[0]))
+        suggested_friends = [uid for uid, _ in common]
+
+        # (2) Nutzer, die über bis zu 3 Ecken verbunden sind und näher als distance_threshold (km) wohnen,
+        #     aufsteigend nach Distanz (der direkte Nachbar zuerst)
+        already = set(suggested_friends) | friends | {user_id}
+        distances = self._distances_from(user_id, distance_threshold)  # EIN Dijkstra für alle Kandidaten
+        nearby = []
+        for other_id in self.keys():
+            if other_id in already:
+                continue
+            if self.are_users_connected(user_id, other_id):
+                distance = distances.get(self._nearest_node(other_id), float('inf'))
+                if distance <= distance_threshold:
+                    nearby.append((other_id, distance))
+        nearby.sort(key=lambda pair: pair[1])
+        suggested_friends += [uid for uid, _ in nearby]
 
         if pretty_print:
             suggested_friends = [self[friend].pretty_print() for friend in suggested_friends]
 
         return suggested_friends
+
+    def _distances_from(self, user_id: str, max_km: float) -> Dict[int, float]:
+        """Distanzen (km) vom Wohnort von user_id zu allen Knoten, die höchstens max_km entfernt sind.
+
+        Ein einziger Dijkstra-Lauf statt eines Laufs pro Kandidat; cutoff bricht ab, sobald max_km überschritten ist.
+        """
+        lengths_m = nx.single_source_dijkstra_path_length(self._get_map_graph(), self._nearest_node(user_id),
+                                                          cutoff=max_km * 1000, weight='length')
+        return {node: meters / 1000.0 for node, meters in lengths_m.items()}
 
     def are_users_connected(self, user_id1: str, user_id2: str, degree: int = 3) -> bool:
         """Prüft mittels Breitensuche, ob zwei Benutzer über Freundschaftskanten verbunden sind.
@@ -245,8 +316,27 @@ class Users(marketplace.praktikumsgruppen.Praktikumsgruppen):
         if user_id1 not in self or user_id2 not in self:
             return False
 
-        # TODO for students: Implement this method
+        if user_id1 == user_id2:
+            return True
 
+        # Breitensuche (BFS): Queue enthält Paare (Nutzer, Freundschaftsgrad zu user_id1)
+        queue = deque([(user_id1, 0)])
+        visited = {user_id1}            # Set: "schon gesehen?" in O(1)
+
+        while queue:
+            current_id, current_degree = queue.popleft()    # FIFO: zuerst die näheren Nutzer
+
+            if current_degree >= degree:    # tiefer als erlaubt: Freunde dieses Nutzers nicht mehr ansehen
+                continue
+
+            for friend_id in self[current_id].friends():
+                if friend_id == user_id2:
+                    return True
+                if friend_id not in visited:
+                    visited.add(friend_id)
+                    queue.append((friend_id, current_degree + 1))
+
+        # Laufzeit: O(V + E) im schlechtesten Fall (V = Nutzer, E = Freundschaften)
         return False
 
     # *** PUBLIC STATIC methods ***

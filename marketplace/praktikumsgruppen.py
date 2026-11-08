@@ -11,8 +11,6 @@ Union, Find mit Pfadkomprimierung).
 #
 from typing import Any, List, Optional, Union
 
-from networkx.classes import non_neighbors
-
 
 class SetNode:
     """Klasse zur Repräsentation eines Knotens in einer Disjoint-Set-Struktur (Union-Find).
@@ -36,7 +34,7 @@ class SetNode:
             None
         """
         # TODO for students (Praktikum 1): ergänzen Sie hier die private Membervariable _praktikumsgruppe
-        self._praktikumsgruppe = None
+        # self._praktikumsgruppe = None
 
         # TODO: werden nur für Praktikum 3 benötigt
         self._parent: SetNode = self   # parent Knoten des SetNode Objekts. self bedeutet, dass der Knoten ein Wurzelknoten ist
@@ -46,11 +44,23 @@ class SetNode:
 
     # *** PUBLIC SET methods ***
 
-    # TODO: implementieren Sie in Praktikum 3 die benötigten Methoden
+    def set_parent(self, parent: 'SetNode') -> None:
+        """Hängt diesen Knoten unter den Knoten parent."""
+        self._parent = parent
+
+    def add_weight(self, weight: int) -> None:
+        """Erhöht das Gewicht (Anzahl Knoten im Teilbaum) um weight."""
+        self._weight += weight
 
     # *** PUBLIC methods to return class properties ***
 
-    # TODO: implementieren Sie in Praktikum 3 die benötigten Methoden
+    def parent(self) -> 'SetNode':
+        """Gibt den Elternknoten zurück (self, wenn der Knoten eine Wurzel ist)."""
+        return self._parent
+
+    def weight(self) -> int:
+        """Gibt das Gewicht (Anzahl Knoten im Teilbaum) zurück."""
+        return self._weight
 
 class Praktikumsgruppen(dict):
     """Klasse zur Repräsentation einer Sammlung disjunkter Mengen (Praktikumsgruppen).
@@ -87,6 +97,24 @@ class Praktikumsgruppen(dict):
     # TODO in Praktikum 3: implement find(node), find_byid(user_id, return_id=False) and 
     #  union(user_id1, user_id2)
 
+    def find(self, node: SetNode) -> SetNode:
+        """Gibt die Wurzel der Menge zurück, in der node liegt (mit Pfadverkürzung)."""
+        if node.parent() is not node:                   # node ist keine Wurzel
+            node.set_parent(self.find(node.parent()))   # Pfadverkürzung: direkt an die Wurzel hängen
+        return node.parent()
+
+    def union(self, user_id1: str, user_id2: str) -> None:
+        """Vereinigt die Gruppen von user_id1 und user_id2 (weighted Quick-Union)."""
+        root1 = self.find(self[user_id1])
+        root2 = self.find(self[user_id2])
+        if root1 is root2:                  # schon in derselben Gruppe
+            return
+
+        if root1.weight() < root2.weight():
+            root1, root2 = root2, root1     # root1 ist jetzt die Wurzel des größeren Baums
+        root2.set_parent(root1)
+        root1.add_weight(root2.weight())
+
     def find_byid(self, user_id: str, return_id: bool = False) -> Union[Any, str]:
         """Findet die Wurzel der Praktikumsgruppe eines Benutzers anhand seiner ID.
 
@@ -102,7 +130,8 @@ class Praktikumsgruppen(dict):
         Raises:
             KeyError: Falls `user_id` nicht im Wörterbuch existiert.
         """
-        return user_id
+        root = self.find(self[user_id])
+        return root.id() if return_id else root
 
     def create_groups(self, user_ids: List[str], groupnumbers: List[int]) -> None:
         """Erstellt Praktikumsgruppen aus Benutzer-IDs und Gruppennummern.
@@ -117,13 +146,13 @@ class Praktikumsgruppen(dict):
         Raises:
             None
         """
-        # TODO: implement in Praktikum 1
-        # Laufzeit O(n)
-        for i in range(len(user_ids)):
-            uid = user_ids[i]
-            grp = groupnumbers[i]
-            if uid in self:
-                self[uid]._praktikumsgruppe = grp
+        # pro Gruppennummer den ersten Nutzer merken und alle weiteren Nutzer dieser Gruppe mit ihm vereinigen
+        first_of_group = {}
+        for user_id, groupnumber in zip(user_ids, groupnumbers):
+            if groupnumber in first_of_group:
+                self.union(first_of_group[groupnumber], user_id)
+            else:
+                first_of_group[groupnumber] = user_id
 
 
     # *** PUBLIC GET methods ***
@@ -141,15 +170,9 @@ class Praktikumsgruppen(dict):
             KeyError: Falls `user_id` nicht im Wörterbuch existiert.
         """
         # TODO: implement in Praktikum 1
-        #Laufzeit : worstcase O(n),
-        # bestcase O(n),
-        # ausnahme wenn user_id nicht im dict. ist O(1)
-        target_id = self[user_id]._praktikumsgruppe #: zugriff auf dict. O(1)
-        members = [] #: leeres array O(1)
-        for uid in self: # wird n mal durchlaufen O(n)
-            if self[uid]._praktikumsgruppe == target_id: #self beinhaltet den KeyError bereits | lookup über schlüssel und vergleich O(1)
-                members.append(uid) #: O(1)
-        return members
+        # alle Nutzer mit derselben Wurzel gehören zur selben Gruppe; O(n), find ist praktisch konstant
+        root = self.find(self[user_id])
+        return [uid for uid, node in self.items() if self.find(node) is root]
 
     def print_ds(self) -> None:
         """Gibt die Disjoint-Set-Struktur aus.

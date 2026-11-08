@@ -653,8 +653,9 @@ class AuctionAppInit:
             auctions = []
 
         for auction_id in auctions:
-            self.item_listbox.insert(tk.END, self._auctions[auction_id].pretty_print(False, user_id_pass))
-
+            # bei den eigenen Geboten zusätzlich das Porto anzeigen (Praktikum 3, Aufgabe 2)
+            portofee = self._auctions.get_portofee(auction_id, user_id) if value == 'bids' else None
+            self.item_listbox.insert(tk.END, self._auctions[auction_id].pretty_print(False, user_id_pass, portofee))
     def on_listbox_select(self, event: tk.Event) -> None:
         """Event-Handler bei Auswahl einer Auktion in der Liste aller Auktionen.
 

@@ -130,7 +130,8 @@ class Auction:
 
         user_id = user.id()
 
-        portofee = self.calculate_portofee()
+        # Porto wird nur angezeigt, nicht abgebucht (s. calculate_portofee); wie bisher 0 €
+        portofee = 0.0
 
         # check whether user already bid before. If yes then check if new bid is higher than previous one.
         # if higher, then decrease balance only by the difference between both bids
@@ -179,11 +180,16 @@ class Auction:
         else:
             return False
 
-    def calculate_portofee(self) -> float:
+    # TODO students (optionale Aufgabe in Praktikum 3): porto (fee) berechnen
+    @staticmethod
+    def calculate_portofee(distance_km: float) -> float:
         """Berechnet Porto für die Lieferung der Bestellung. Porto ist abhängig von Distanz zwischen Käufer und Verkäufer.
 
+        Signatur angepasst (Praktikum 3): die Auktion kennt weder Käufer noch Wohnorte, deshalb wird die
+        Distanz übergeben. Sie wird in Auctions.get_portofee() mit dem Straßengraphen berechnet.
+
         Args:
-            None
+            distance_km (float): Straßendistanz zwischen Verkäufer und Käufer in km.
 
         Returns:
             float: Die Portogebühr in Euro.
@@ -191,9 +197,8 @@ class Auction:
         Raises:
             None
         """
-        # TODO students (optionale Aufgabe in Praktikum 3): porto (fee) berechnen
-        
-        return 0.0
+        # 0,1 € pro 5 km, proportional zur Distanz; auf Cent gerundet
+        return round(distance_km / 5 * 0.1, 2)
 
     # *** PUBLIC GET methods ***
 
@@ -239,12 +244,14 @@ class Auction:
         """
         return datetime.now() >= self._auction_ends
 
-    def pretty_print(self, with_sold_by: bool = True, user_id: Optional[str] = None) -> str:
+    def pretty_print(self, with_sold_by: bool = True, user_id: Optional[str] = None,
+                     portofee: Optional[float] = None) -> str:
         """Formatiert die Auktionsdetails als String für die Listboxen.
 
         Args:
             with_sold_by (bool): Gibt an, ob der Verkäufer angezeigt werden soll.
             user_id (Optional[str]): Falls angegeben, wird auch das eigene Gebot des Benutzers dargestellt.
+            portofee (Optional[float]): Falls angegeben, wird zusätzlich das Porto angezeigt.
 
         Returns:
             str: Der formatierte Auktions-String.
@@ -258,10 +265,13 @@ class Auction:
                 self.get_highest_bid(),
                 marketplace.auction.Auction.format_datetime(self._auction_ends), self._seller_id.ljust(10))
         elif user_id is not None:
-            return "ID: {0} Name: {1} Mindestgebot: {2} € \tHöchstes Gebot: {3} € \tIhr Gebot: {4} € \tAuktionsende: {5}".format(
+            text = "ID: {0} Name: {1} Mindestgebot: {2} € \tHöchstes Gebot: {3} € \tIhr Gebot: {4} € \tAuktionsende: {5}".format(
                 self._id.ljust(15), self._item.name().ljust(30), self._item.value_min(),
                 self.get_highest_bid(), self.get_bid_of_user(user_id),
                 marketplace.auction.Auction.format_datetime(self._auction_ends))
+            if portofee is not None:
+                text += " \tPorto: {0:.2f} €".format(portofee)
+            return text
         else:
             return "ID: {0} Name: {1} Mindestgebot: {2} € \tHöchstes Gebot: {3} € \tAuktionsende: {4}".format(
                 self._id.ljust(15), self._item.name().ljust(30), self._item.value_min(),
