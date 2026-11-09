@@ -23,14 +23,15 @@ import marketplace.praktikumsgruppen
 from collections import deque
 
 import os
+import zipfile
 import networkx as nx
 import osmnx as ox
 from shapely.geometry import box
 
 # Straßengraph: wird einmal heruntergeladen und danach nur noch lokal geladen
-GRAPH_FILE = "nrw_motorways.graphml"
+GRAPH_FILE = "nrw_secondary.graphml"
 # nur größere Straßen, damit der Graph für ganz NRW klein genug bleibt
-ROAD_FILTER = '["highway"~"motorway|motorway_link|trunk|trunk_link"]'
+ROAD_FILTER = '["highway"~"motorway|motorway_link|trunk|trunk_link|primary|primary_link|secondary|secondary_link"]'
 
 
 class Users(marketplace.praktikumsgruppen.Praktikumsgruppen):
@@ -103,8 +104,12 @@ class Users(marketplace.praktikumsgruppen.Praktikumsgruppen):
         return distance_m / 1000.0  # in Kilometern
 
     def _get_map_graph(self) -> nx.MultiDiGraph:
-        """Lädt den Straßengraphen. Beim allerersten Aufruf wird er heruntergeladen und als Datei gespeichert."""
+        """Lädt den Straßengraphen. ..."""
         if self._map_graph is None:
+            # Der Graph liegt im Repository als ZIP (entpackt über 100 MB): beim ersten Start entpacken
+            if not os.path.exists(GRAPH_FILE) and os.path.exists(GRAPH_FILE + ".zip"):
+                with zipfile.ZipFile(GRAPH_FILE + ".zip") as archive:
+                    archive.extractall()
             if os.path.exists(GRAPH_FILE):
                 self._map_graph = ox.load_graphml(GRAPH_FILE)
             else:
